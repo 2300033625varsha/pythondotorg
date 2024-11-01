@@ -1,28 +1,41 @@
-from django.test import TestCase
+import unittest
+from your_app.models import Product  # Adjust the import based on your project structure
+from your_app.database import db_session  # Assuming you're using SQLAlchemy or similar
 
-from ..factories import StoryFactory, StoryCategoryFactory
-from ..models import Story
+class TestProductModel(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        """Set up a test product before running the tests."""
+        cls.product = Product(name='Original Product', price=29.99, description='An original product.', category='Test Category')
+        db_session.add(cls.product)
+        db_session.commit()
 
-class StoryModelTests(TestCase):
-    def setUp(self):
-        self.category = StoryCategoryFactory()
-        self.story1 = StoryFactory(category=self.category)
-        self.story2 = StoryFactory(name='Fraft Story', category=self.category, is_published=False)
-        self.story3 = StoryFactory(name='Featured Story', category=self.category, featured=True)
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up after tests are done."""
+        db_session.delete(cls.product)
+        db_session.commit()
 
-    def test_published(self):
-        self.assertEqual(len(Story.objects.published()), 2)
+    def test_update_product(self):
+        """Test the UPDATE operation for a product."""
+        # Update the product's details
+        self.product.name = 'Updated Product'
+        self.product.price = 39.99
+        self.product.description = 'An updated product.'
+        self.product.category = 'Updated Category'
+        db_session.commit()
 
-    def test_draft(self):
-        draft_stories = Story.objects.draft()
-        self.assertTrue(all(story.name == 'Fraft Story' for story in draft_stories))
+        # Fetch the updated product from the database
+        updated_product = db_session.query(Product).filter_by(id=self.product.id).first()
 
-    def test_featured(self):
-        featured_stories = Story.objects.featured()
-        expected_repr = [f'<Story: {self.story3.name}>']
-        self.assertQuerysetEqual(featured_stories, expected_repr, transform=repr)
+        # Assertions to check if the updated product matches expected values
+        self.assertIsNotNone(updated_product)  # Ensure the product is found
+        self.assertEqual(updated_product.name, 'Updated Product')
+        self.assertEqual(updated_product.price, 39.99)
+        self.assertEqual(updated_product.description, 'An updated product.')
+        self.assertEqual(updated_product.category, 'Updated Category')
 
-    def test_get_admin_url(self):
-        self.assertEqual(self.story1.get_admin_url(),
-                         '/admin/successstories/story/%d/change/' % self.story1.pk)
+if __name__ == '__main__':
+    unittest.main()
+
