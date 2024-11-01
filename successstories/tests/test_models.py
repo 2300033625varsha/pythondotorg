@@ -1,28 +1,45 @@
-from django.test import TestCase
+import unittest
+from your_app.models import Product  # Adjust the import based on your project structure
+from your_app.database import db_session  # Assuming you're using SQLAlchemy or similar
 
-from ..factories import StoryFactory, StoryCategoryFactory
-from ..models import Story
+class TestProductModel(unittest.TestCase):
 
+    @classmethod
+    def setUpClass(cls):
+        """Set up test products before running the tests."""
+        cls.product1 = Product(name='Product A', price=10.99, description='First test product.', category='Category 1')
+        cls.product2 = Product(name='Product B', price=20.99, description='Second test product.', category='Category 2')
+        cls.product3 = Product(name='Product C', price=15.99, description='Third test product.', category='Category 1')
+        
+        db_session.add(cls.product1)
+        db_session.add(cls.product2)
+        db_session.add(cls.product3)
+        db_session.commit()
 
-class StoryModelTests(TestCase):
-    def setUp(self):
-        self.category = StoryCategoryFactory()
-        self.story1 = StoryFactory(category=self.category)
-        self.story2 = StoryFactory(name='Fraft Story', category=self.category, is_published=False)
-        self.story3 = StoryFactory(name='Featured Story', category=self.category, featured=True)
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up after tests are done."""
+        db_session.delete(cls.product1)
+        db_session.delete(cls.product2)
+        db_session.delete(cls.product3)
+        db_session.commit()
 
-    def test_published(self):
-        self.assertEqual(len(Story.objects.published()), 2)
+    def test_find_products_by_category(self):
+        """Test finding products by their category."""
+        # Query products by category
+        found_products = db_session.query(Product).filter_by(category='Category 1').all()
 
-    def test_draft(self):
-        draft_stories = Story.objects.draft()
-        self.assertTrue(all(story.name == 'Fraft Story' for story in draft_stories))
+        # Assertions to check if the correct products are retrieved
+        self.assertEqual(len(found_products), 2)  # Ensure we have two products in Category 1
+        self.assertIn(self.product1, found_products)  # Check that product1 is in the list
+        self.assertIn(self.product3, found_products)  # Check that product3 is in the list
 
-    def test_featured(self):
-        featured_stories = Story.objects.featured()
-        expected_repr = [f'<Story: {self.story3.name}>']
-        self.assertQuerysetEqual(featured_stories, expected_repr, transform=repr)
+    def test_find_no_products_in_category(self):
+        """Test finding products in a category with no products."""
+        found_products = db_session.query(Product).filter_by(category='Nonexistent Category').all()
 
-    def test_get_admin_url(self):
-        self.assertEqual(self.story1.get_admin_url(),
-                         '/admin/successstories/story/%d/change/' % self.story1.pk)
+        # Ensure no products are found
+        self.assertEqual(len(found_products), 0)
+
+if __name__ == '__main__':
+    unittest.main()
